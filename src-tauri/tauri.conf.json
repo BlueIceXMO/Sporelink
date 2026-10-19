@@ -40,7 +40,12 @@
       "icons/icon.ico"
     ],
     "shortDescription": "Local-first knowledge exploration",
-    "longDescription": "Sporelink is a local-first desktop knowledge exploration tool built on a unified node/edge graph."
+    "longDescription": "Sporelink is a local-first desktop knowledge exploration tool built on a unified node/edge graph.",
+    "resources": [
+      "../LICENSE",
+      "../THIRD_PARTY_NOTICES.md",
+      "../licenses/VelesDB-Core-LICENSE.txt"
+    ]
   },
   "plugins": {}
 }
