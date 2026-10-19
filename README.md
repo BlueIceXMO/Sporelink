@@ -35,6 +35,30 @@ npm run build
 npm run tauri build
 ```
 
+只构建可执行文件（不生成安装包）：
+
+```bash
+npm run tauri -- build --debug --no-bundle
+```
+
+## 验证
+
+```bash
+npm run typecheck
+npm run build
+cargo test --manifest-path src-tauri/Cargo.toml
+```
+
+端到端冒烟需要一个正在运行、带 WebView2 远程调试端口的应用：
+
+```bash
+# 终端 A（应用运行后）
+npm run smoke       # 引导 / 示例项目 / Mock 流式 / 上下文
+npm run api-smoke   # 图、搜索、文档、知识、摘要、导出、导入、快照
+```
+
+`scripts/*.mjs` 通过 `DSH_WEBVIEW_CDP`（默认 `http://127.0.0.1:9222`）连接 WebView2；只用于本地验证，不是产品依赖。
+
 默认数据目录由 Tauri 的 `app_data_dir` 决定。调试时可以用环境变量覆盖：
 
 ```bash
