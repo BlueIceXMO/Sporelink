@@ -1,0 +1,54 @@
+[package]
+name = "sporelink"
+version = "0.1.0-alpha"
+description = "Local-first knowledge exploration desktop app"
+authors = ["Sporelink contributors"]
+edition = "2021"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/BlueIceXMO/Sporelink"
+
+[lib]
+name = "sporelink_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "fs"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+keyring = "3"
+velesdb-core = "6"
+sha2 = "0.10"
+hex = "0.4"
+base64 = "0.22"
+zip = "2"
+quick-xml = "0.37"
+lopdf = "0.34"
+scraper = "0.23"
+regex = "1"
+mime_guess = "2"
+url = "2"
+parking_lot = "0.12"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+async-trait = "0.1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

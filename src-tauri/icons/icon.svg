@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="70%">
+      <stop offset="0%" stop-color="#1c2a23"/>
+      <stop offset="100%" stop-color="#0b0f0c"/>
+    </radialGradient>
+    <radialGradient id="spore" cx="40%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="#d7ffb0"/>
+      <stop offset="55%" stop-color="#7fe08d"/>
+      <stop offset="100%" stop-color="#2f8f5b"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+  <g stroke="#7fe08d" stroke-width="18" stroke-linecap="round" opacity="0.75">
+    <path d="M512 520 L512 250"/>
+    <path d="M512 520 L770 640"/>
+    <path d="M512 520 L254 640"/>
+    <path d="M770 640 L860 470"/>
+    <path d="M254 640 L164 470"/>
+    <path d="M770 640 L820 820"/>
+    <path d="M254 640 L204 820"/>
+  </g>
+  <g fill="url(#spore)">
+    <circle cx="512" cy="520" r="92"/>
+    <circle cx="512" cy="250" r="46"/>
+    <circle cx="770" cy="640" r="52"/>
+    <circle cx="254" cy="640" r="52"/>
+    <circle cx="860" cy="470" r="30"/>
+    <circle cx="164" cy="470" r="30"/>
+    <circle cx="820" cy="820" r="26"/>
+    <circle cx="204" cy="820" r="26"/>
+  </g>
+  <circle cx="512" cy="520" r="140" fill="none" stroke="#d7ffb0" stroke-width="6" opacity="0.35"/>
+</svg>

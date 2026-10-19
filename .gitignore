@@ -1,0 +1,12 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+artifacts/
+coverage/
+.npm-cache/
+*.log
+.env
+.env.*
+.DS_Store
+Thumbs.db

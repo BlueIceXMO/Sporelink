@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Sporelink",
+  "version": "0.1.0-alpha",
+  "identifier": "com.sporelink.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:1520",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "title": "Sporelink",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 660,
+        "resizable": true,
+        "center": true,
+        "decorations": true,
+        "transparent": false,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src ipc: http://ipc.localhost; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "shortDescription": "Local-first knowledge exploration",
+    "longDescription": "Sporelink is a local-first desktop knowledge exploration tool built on a unified node/edge graph."
+  },
+  "plugins": {}
+}
