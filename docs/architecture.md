@@ -72,9 +72,12 @@ Rust commands
     db/                    # VelesDB
     attachments/<sha256>   # 附件内容寻址
     snapshots/<id>/        # 全量 JSON 快照
+  logs/startup.log         # 启动路径与错误，不含正文/Key
 ```
 
 `app.json` 只用于打开 Vault，不存业务内容。
+
+路径选择是自愈的：优先 `%APPDATA%\Sporelink`，不可写时回退 `%LOCALAPPDATA%\Sporelink`，再回退 exe 同级 `SporelinkData`。WebView2 profile 同样优先 `%LOCALAPPDATA%\Sporelink\WebView2`，再回退到 `SporelinkData\WebView2`。启动日志写在这些目录的 `logs/startup.log`。这样双击运行不依赖外部环境变量。
 
 ### 3.3 不变量
 
