@@ -6,6 +6,7 @@ use crate::domain::model::{new_id, Node, NodeType};
 use crate::error::{AppError, AppResult};
 use crate::keychain::Keychain;
 use crate::llm;
+use crate::paths;
 use crate::service;
 use crate::store::Store;
 use parking_lot::RwLock;
@@ -14,7 +15,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use tauri::Manager;
 
 pub const APP_VERSION: &str = "0.1.0-alpha";
 
@@ -117,19 +117,24 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(app: &tauri::AppHandle) -> Self {
-        let data_dir = std::env::var("SPORELINK_DATA_DIR")
-            .map(PathBuf::from)
-            .ok()
-            .or_else(|| app.path().app_data_dir().ok())
-            .unwrap_or_else(|| PathBuf::from("."));
+    pub fn new(_app: &tauri::AppHandle) -> Self {
+        let data_dir = paths::data_dir();
         let fallback_data_dir = data_dir.clone();
-        match init_inner(app, &data_dir) {
-            Ok(inner) => Self {
-                inner: Ok(Arc::new(inner)),
-                fallback_data_dir,
-            },
+        paths::append_log(&format!(
+            "startup data_dir={} webview_dir={}",
+            data_dir.display(),
+            paths::webview_dir().display()
+        ));
+        match init_inner(&data_dir) {
+            Ok(inner) => {
+                paths::append_log("initialized");
+                Self {
+                    inner: Ok(Arc::new(inner)),
+                    fallback_data_dir,
+                }
+            }
             Err(error) => {
+                paths::append_log(&format!("init error: {error}"));
                 tracing::error!("failed to initialize app: {error}");
                 Self {
                     inner: Err(error),
@@ -173,7 +178,7 @@ impl AppState {
     }
 }
 
-fn init_inner(app: &tauri::AppHandle, data_dir: &PathBuf) -> AppResult<AppInner> {
+fn init_inner(data_dir: &PathBuf) -> AppResult<AppInner> {
     std::fs::create_dir_all(data_dir).map_err(|e| {
         AppError::io(format!("创建数据目录失败 {}: {e}", data_dir.display()))
     })?;
@@ -214,7 +219,6 @@ fn init_inner(app: &tauri::AppHandle, data_dir: &PathBuf) -> AppResult<AppInner>
         http: llm::http_client(),
         cancel: parking_lot::Mutex::new(HashMap::new()),
     };
-    let _ = app;
     Ok(inner)
 }
 

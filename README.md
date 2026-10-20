@@ -67,6 +67,9 @@ SPORELINK_DATA_DIR=D:\path\to\sporelink-data
 
 ## 数据与安全
 
+- 默认业务数据目录：`%APPDATA%\Sporelink`；如果该位置不可写，回退到 `%LOCALAPPDATA%\Sporelink`，再回退到 exe 同级的 `SporelinkData`。
+- WebView2 profile 同样按 `%LOCALAPPDATA%\Sporelink\WebView2` → `SporelinkData\WebView2` 回退。
+- 启动失败时查看 `logs\startup.log`（在上述任一数据目录下）；里面只记路径与错误码，不记消息正文或 Key。
 - 业务数据只写入本地 VelesDB；没有账号、云同步、遥测、远程配置或自动更新。
 - API Key 只存在 OS keychain；前端只能读取“已设置/未设置”，没有读取 Key 的 IPC。
 - 导出不含 Key；导出前会递归剔除 `apiKey`、`authorization`、`secret` 等字段。

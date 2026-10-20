@@ -6,6 +6,7 @@ pub mod error;
 pub mod export;
 pub mod keychain;
 pub mod llm;
+pub mod paths;
 pub mod sample;
 pub mod search;
 pub mod service;
@@ -17,6 +18,20 @@ use state::AppState;
 use tauri::Manager;
 
 pub fn run() {
+    paths::ensure_tauri_dirs();
+    paths::ensure_webview_env();
+    paths::append_log(&format!(
+        "run start data_dir={} webview_dir={}",
+        paths::data_dir().display(),
+        paths::webview_dir().display()
+    ));
+
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        paths::append_log(&format!("PANIC: {info}"));
+        default_hook(info);
+    }));
+
     let _ = tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
