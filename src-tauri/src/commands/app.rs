@@ -1,33 +1,12 @@
 use crate::domain::dto::*;
 use crate::error::AppResult;
-use crate::service;
 use crate::state::{AppState, APP_VERSION};
+use std::path::PathBuf;
 use tauri::State;
 
 #[tauri::command]
 pub fn bootstrap(state: State<'_, AppState>) -> Bootstrap {
-    match state.inner().inner() {
-        Ok(inner) => {
-            let settings_state = inner.settings_state();
-            Bootstrap {
-                version: APP_VERSION.into(),
-                vault: inner.vault.clone(),
-                settings: settings_state.settings,
-                settings_revision: settings_state.revision,
-                projects: service::list_projects(&inner.store, true),
-                folders: service::list_folders(&inner.store),
-                models: service::list_model_profiles(&inner.store).unwrap_or_default(),
-                counts: inner.store.counts(),
-                keychain_available: inner.keychain.available(),
-                init_error: None,
-            }
-        }
-        Err(error) => {
-            let mut bootstrap = state.fallback_bootstrap();
-            bootstrap.init_error = Some(error);
-            bootstrap
-        }
-    }
+    state.bootstrap()
 }
 
 #[tauri::command]
@@ -47,11 +26,11 @@ pub fn settings_update(
 #[tauri::command]
 pub fn diagnostics(state: State<'_, AppState>) -> AppResult<Diagnostics> {
     let inner = state.inner().inner()?;
-    let models = service::list_model_profiles(&inner.store)?.len();
+    let models = inner.config.read().model_profiles.len();
     Ok(Diagnostics {
         version: APP_VERSION.into(),
         platform: format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH),
-        data_dir: inner.data_dir.to_string_lossy().to_string(),
+        data_dir: inner.workspace.root.to_string_lossy().to_string(),
         db_path: inner.store.db_path.to_string_lossy().to_string(),
         counts: inner.store.counts(),
         keychain_available: inner.keychain.available(),
@@ -61,9 +40,42 @@ pub fn diagnostics(state: State<'_, AppState>) -> AppResult<Diagnostics> {
 }
 
 #[tauri::command]
+pub fn workspace_info(state: State<'_, AppState>) -> AppResult<WorkspaceInfo> {
+    Ok(state.inner().inner()?.workspace.info())
+}
+
+#[tauri::command]
+pub fn workspace_open(state: State<'_, AppState>, path: String) -> AppResult<Bootstrap> {
+    state.switch_workspace(PathBuf::from(path))
+}
+
+#[tauri::command]
+pub fn workspace_default(state: State<'_, AppState>) -> AppResult<Bootstrap> {
+    state.open_default_workspace()
+}
+
+#[tauri::command]
+pub fn workspace_file_list(state: State<'_, AppState>) -> AppResult<Vec<WorkspaceFile>> {
+    let inner = state.inner().inner()?;
+    let config = inner.config.read();
+    inner.workspace.list_user_files(&config.ignore_patterns)
+}
+
+#[tauri::command]
+pub fn workspace_read_file(
+    state: State<'_, AppState>,
+    path: String,
+    start_line: Option<usize>,
+    end_line: Option<usize>,
+) -> AppResult<String> {
+    let inner = state.inner().inner()?;
+    inner.workspace.read_text(&path, start_line, end_line)
+}
+
+#[tauri::command]
 pub fn open_data_dir(state: State<'_, AppState>) -> AppResult<()> {
     let inner = state.inner().inner()?;
-    let path = inner.data_dir.to_string_lossy().to_string();
+    let path = inner.workspace.root.to_string_lossy().to_string();
     #[cfg(target_os = "windows")]
     let result = std::process::Command::new("explorer").arg(&path).spawn();
     #[cfg(target_os = "macos")]

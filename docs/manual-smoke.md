@@ -1,12 +1,23 @@
 # 手动冒烟脚本（v0.1.0-alpha）
 
 > 目标：在不配置任何真实 API Key 的情况下，用 Mock 模型走通核心闭环。
-> 如果使用了 `SPORELINK_DATA_DIR`，先清空该测试目录再开始。
+> 测试用 `SPORELINK_CONFIG_DIR` 和 `SPORELINK_WORKSPACE` 指向临时目录；默认配置在 `~/.sporelink`，主数据在 `<workspace>/.spore`。
 
 ## 0. 启动
 
 1. 启动 `npm run tauri dev` 或运行构建后的 exe。
 2. 期望：窗口出现，首次显示引导弹窗；没有白屏或 Node/Key 泄露。
+
+## 0.1 工作区
+
+1. 打开设置 → 工作区；确认当前根路径与 `<root>/.spore` 正确显示。
+2. 选择一个已有普通文件的文件夹（例如 `test_ws/`）；期望有 `.spore` 则打开，没有则创建。
+3. 在文件管理器里确认 `.spore/workspace.json`、`.spore/db/` 出现；用户原文件没有被移动。
+4. 导入工作区内的文档：文档 path 应保持工作区相对路径，`<root>/attachments` 不新增副本。
+5. 导入工作区外的文档：期望复制到 `<root>/attachments/` 后再索引。
+6. 文件列表/读取不应出现 `.spore` 或 `.sporelink`；直接读取 `.spore/workspace.json` 应被拒绝。
+7. 切换另一个工作区再切回；项目/卡片应随工作区切换，原工作区数据不丢。
+
 
 ## 1. 首次引导
 

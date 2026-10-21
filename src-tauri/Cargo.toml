@@ -39,6 +39,7 @@ regex = "1"
 mime_guess = "2"
 url = "2"
 dirs = "7"
+dunce = "1"
 parking_lot = "0.12"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

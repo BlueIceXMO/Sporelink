@@ -1,15 +1,14 @@
 use crate::domain::dto::*;
-use crate::domain::model::{now_ms, Node, NodeType};
+use crate::domain::model::new_id;
 use crate::error::{AppError, AppResult};
 use crate::llm;
-use crate::service;
 use crate::state::AppState;
 use serde_json::json;
 use tauri::State;
 
 #[tauri::command]
 pub fn model_profile_list(state: State<'_, AppState>) -> AppResult<Vec<ModelProfileDto>> {
-    service::list_model_profiles(&state.inner().inner()?.store)
+    Ok(state.app_config().model_profiles)
 }
 
 #[tauri::command]
@@ -17,23 +16,17 @@ pub fn model_profile_create(
     state: State<'_, AppState>,
     input: ModelProfileData,
 ) -> AppResult<ModelProfileDto> {
-    let inner = state.inner().inner()?;
     if input.label.trim().is_empty() || input.model.trim().is_empty() {
         return Err(AppError::invalid("模型名称与模型 ID 不能为空"));
     }
-    let node = Node::new(
-        NodeType::ModelProfile,
-        None,
-        input.label.clone(),
-        "",
-        serde_json::to_value(&input)?,
-    );
-    let node = inner.store.put_node(node, None)?;
-    Ok(ModelProfileDto {
-        id: node.id,
-        revision: node.revision,
+    let profile = ModelProfileDto {
+        id: new_id(),
+        revision: 1,
         data: input,
-    })
+    };
+    let created = profile.clone();
+    state.update_config(|config| config.model_profiles.push(profile))?;
+    Ok(created)
 }
 
 #[tauri::command]
@@ -43,61 +36,55 @@ pub fn model_profile_update(
     patch: ModelProfilePatch,
     expected_revision: u64,
 ) -> AppResult<ModelProfileDto> {
-    let inner = state.inner().inner()?;
-    let mut node = inner
-        .store
-        .live_node(&id)
-        .filter(|node| node.node_type == NodeType::ModelProfile)
-        .ok_or_else(|| AppError::not_found("model profile"))?;
-    let mut data = serde_json::from_value::<ModelProfileData>(node.data.clone())
-        .map_err(|e| AppError::parse(e.to_string()))?;
+    let current = state.app_config();
+    let mut profile = current.model_profile(&id)?;
+    if profile.revision != expected_revision {
+        return Err(AppError::revision_conflict(
+            expected_revision,
+            profile.revision,
+        ));
+    }
     if let Some(label) = patch.label {
-        data.label = label.clone();
-        node.title = label;
+        profile.data.label = label;
     }
     if let Some(base_url) = patch.base_url {
-        data.base_url = base_url;
+        profile.data.base_url = base_url;
     }
     if let Some(model) = patch.model {
-        data.model = model;
+        profile.data.model = model;
     }
     if let Some(context_window) = patch.context_window {
-        data.context_window = context_window;
+        profile.data.context_window = context_window;
     }
     if let Some(max_output) = patch.max_output {
-        data.max_output = max_output;
+        profile.data.max_output = max_output;
     }
     if let Some(capabilities) = patch.capabilities {
-        data.capabilities = capabilities;
+        profile.data.capabilities = capabilities;
     }
     if let Some(pricing) = patch.pricing {
-        data.pricing = pricing;
+        profile.data.pricing = pricing;
     }
     if let Some(roles) = patch.roles {
-        data.roles = roles;
+        profile.data.roles = roles;
     }
-    node.data = serde_json::to_value(&data)?;
-    let node = inner.store.put_node(node, Some(expected_revision))?;
-    Ok(ModelProfileDto {
-        id: node.id,
-        revision: node.revision,
-        data,
-    })
+    profile.revision = profile.revision.saturating_add(1);
+    let updated = profile.clone();
+    state.update_config(|config| config.save_model_profile(profile))?;
+    Ok(updated)
 }
 
 #[tauri::command]
 pub fn model_profile_delete(state: State<'_, AppState>, id: String) -> AppResult<()> {
-    let inner = state.inner().inner()?;
-    let mut node = inner
-        .store
-        .live_node(&id)
-        .filter(|node| node.node_type == NodeType::ModelProfile)
-        .ok_or_else(|| AppError::not_found("model profile"))?;
-    if node.data_bool("isBuiltin").unwrap_or(false) {
+    let current = state.app_config();
+    let profile = current.model_profile(&id)?;
+    if profile.data.is_builtin {
         return Err(AppError::new("invalid_input", "内置 Mock 模型不能删除"));
     }
-    node.deleted_at = Some(now_ms());
-    inner.store.put_node(node, None)?;
+    state.update_config(|config| {
+        let _ = config.delete_model_profile(&id);
+    })?;
+    let inner = state.inner().inner()?;
     let _ = inner.keychain.delete(&id);
     Ok(())
 }
@@ -105,17 +92,17 @@ pub fn model_profile_delete(state: State<'_, AppState>, id: String) -> AppResult
 #[tauri::command]
 pub async fn model_test(state: State<'_, AppState>, id: String) -> AppResult<ModelTestResult> {
     let inner = state.inner().inner()?;
-    let (node, model) = inner.model_profile(&id)?;
-    let key = inner.api_key(&node.id)?;
-    llm::test_model(&inner.http, &id, &model, key.as_deref()).await
+    let profile = inner.model_profile(&id)?;
+    let key = inner.api_key(&profile.id)?;
+    llm::test_model(&inner.http, &id, &profile.data, key.as_deref()).await
 }
 
 #[tauri::command]
 pub async fn model_list_remote(state: State<'_, AppState>, id: String) -> AppResult<Vec<String>> {
     let inner = state.inner().inner()?;
-    let (node, model) = inner.model_profile(&id)?;
-    let key = inner.api_key(&node.id)?;
-    llm::list_models(&inner.http, &model, key.as_deref()).await
+    let profile = inner.model_profile(&id)?;
+    let key = inner.api_key(&profile.id)?;
+    llm::list_models(&inner.http, &profile.data, key.as_deref()).await
 }
 
 #[tauri::command]

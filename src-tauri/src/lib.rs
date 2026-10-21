@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod config;
 pub mod context;
 pub mod documents;
 pub mod domain;
@@ -12,6 +13,7 @@ pub mod search;
 pub mod service;
 pub mod state;
 pub mod store;
+pub mod workspace;
 
 use commands::*;
 use state::AppState;
@@ -21,8 +23,9 @@ pub fn run() {
     paths::ensure_tauri_dirs();
     paths::ensure_webview_env();
     paths::append_log(&format!(
-        "run start data_dir={} webview_dir={}",
-        paths::data_dir().display(),
+        "run start config_dir={} default_workspace={} webview_dir={}",
+        paths::config_dir().display(),
+        paths::default_workspace().display(),
         paths::webview_dir().display()
     ));
 
@@ -53,6 +56,11 @@ pub fn run() {
             settings_update,
             diagnostics,
             open_data_dir,
+            workspace_info,
+            workspace_open,
+            workspace_default,
+            workspace_file_list,
+            workspace_read_file,
             project_list,
             project_get,
             project_create,

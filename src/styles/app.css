@@ -796,6 +796,76 @@ select { appearance: none; padding-right: 26px; }
   .modal-backdrop { padding: 10px; }
 }
 
+.context-path {
+  display: block;
+  margin: 2px 0 4px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.workspace-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  margin-bottom: 14px;
+}
+
+.workspace-block {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.workspace-block span,
+.workspace-access > span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.workspace-block strong,
+.workspace-block code {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.workspace-block code {
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+}
+
+.workspace-actions,
+.workspace-access {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.access-pill {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.access-pill.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.access-pill:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }

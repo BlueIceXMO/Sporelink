@@ -31,6 +31,8 @@ import type {
   SettingsState,
   SnapshotSummary,
   TrashItem,
+  WorkspaceFile,
+  WorkspaceInfo,
 } from "./types";
 
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -72,6 +74,12 @@ export const ipc = {
     call<SettingsState>("settings_update", { settings, expectedRevision }),
   diagnostics: () => call<Diagnostics>("diagnostics"),
   openDataDir: () => call<void>("open_data_dir"),
+  workspaceInfo: () => call<WorkspaceInfo>("workspace_info"),
+  workspaceOpen: (path: string) => call<Bootstrap>("workspace_open", { path }),
+  workspaceDefault: () => call<Bootstrap>("workspace_default"),
+  workspaceFileList: () => call<WorkspaceFile[]>("workspace_file_list"),
+  workspaceReadFile: (path: string, startLine?: number, endLine?: number) =>
+    call<string>("workspace_read_file", { path, startLine, endLine }),
 
   projectList: (includeArchived = false) =>
     call<ProjectSummary[]>("project_list", { includeArchived }),

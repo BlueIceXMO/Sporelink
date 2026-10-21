@@ -273,6 +273,7 @@ export type ContextItem = {
   reason: string;
   included: boolean;
   droppedReason?: string | null;
+  path?: string | null;
 };
 
 export type ContextPreview = {
@@ -378,6 +379,7 @@ export type DocumentSummary = {
   projectId: string | null;
   title: string;
   fileName: string;
+  path: string;
   mime: string;
   pages: number;
   chunkCount: number;
@@ -435,6 +437,23 @@ export type VaultInfo = {
   path: string;
 };
 
+export type WorkspaceInfo = {
+  id: string;
+  name: string;
+  root: string;
+  internal: string;
+  access: "rw" | "ro" | "full" | string;
+  createdAt: number;
+};
+
+export type WorkspaceFile = {
+  path: string;
+  name: string;
+  size: number;
+  isDir: boolean;
+  modifiedAt: number;
+};
+
 export type Diagnostics = {
   version: string;
   platform: string;
@@ -449,6 +468,7 @@ export type Diagnostics = {
 export type Bootstrap = {
   version: string;
   vault: VaultInfo;
+  workspace: WorkspaceInfo;
   settings: Settings;
   settingsRevision: number;
   projects: ProjectSummary[];

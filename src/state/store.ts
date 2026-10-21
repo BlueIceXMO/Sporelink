@@ -86,6 +86,8 @@ type AppState = {
 
   initialize: () => Promise<void>;
   refreshBootstrap: () => Promise<void>;
+  openWorkspace: (path: string) => Promise<boolean>;
+  openDefaultWorkspace: () => Promise<boolean>;
   setView: (view: View) => void;
   openProject: (id: string) => Promise<void>;
   closeProject: () => void;
@@ -313,6 +315,93 @@ export const useAppStore = create<AppState>((set, get) => ({
       sidebarCollapsed: boot.settings.layout.sidebarCollapsed,
       tree2d: boot.settings.layout.force2dTree,
     });
+  },
+
+  openWorkspace: async (path) => {
+    set({ busy: { ...get().busy, workspace: true } });
+    try {
+      const boot = await ipc.workspaceOpen(path);
+      applyTheme(boot.settings.themeId);
+      set({
+        boot,
+        settings: boot.settings,
+        settingsRevision: boot.settingsRevision,
+        projects: boot.projects,
+        folders: boot.folders,
+        models: boot.models,
+        composerModelId: defaultModelId(boot.models, boot.settings),
+        sidebarCollapsed: boot.settings.layout.sidebarCollapsed,
+        tree2d: boot.settings.layout.force2dTree,
+        onboardingOpen: !boot.settings.onboarding.completed,
+        view: "welcome",
+        currentProject: null,
+        graph: null,
+        currentCard: null,
+        selectedCardId: null,
+        contextPreview: null,
+        streaming: null,
+        documents: [],
+        currentDocument: null,
+        knowledge: [],
+        snapshots: [],
+        searchResults: [],
+        searchTookMs: 0,
+        loading: false,
+        fatalError: boot.initError ?? null,
+      });
+      get().toast(
+        "success",
+        get().settings?.locale === "en" ? "Workspace opened" : "工作区已打开",
+        boot.workspace.root,
+      );
+      return true;
+    } catch (error) {
+      const e = errorToast(error);
+      get().toast("error", e.message, e.detail);
+      return false;
+    } finally {
+      set({ busy: { ...get().busy, workspace: false } });
+    }
+  },
+
+  openDefaultWorkspace: async () => {
+    set({ busy: { ...get().busy, workspace: true } });
+    try {
+      const boot = await ipc.workspaceDefault();
+      applyTheme(boot.settings.themeId);
+      set({
+        boot,
+        settings: boot.settings,
+        settingsRevision: boot.settingsRevision,
+        projects: boot.projects,
+        folders: boot.folders,
+        models: boot.models,
+        composerModelId: defaultModelId(boot.models, boot.settings),
+        sidebarCollapsed: boot.settings.layout.sidebarCollapsed,
+        tree2d: boot.settings.layout.force2dTree,
+        onboardingOpen: !boot.settings.onboarding.completed,
+        view: "welcome",
+        currentProject: null,
+        graph: null,
+        currentCard: null,
+        selectedCardId: null,
+        contextPreview: null,
+        streaming: null,
+        documents: [],
+        currentDocument: null,
+        knowledge: [],
+        snapshots: [],
+        loading: false,
+        fatalError: boot.initError ?? null,
+      });
+      return true;
+    } catch (error) {
+      const e = errorToast(error);
+      get().toast("error", e.message, e.detail);
+      return false;
+    } finally {
+      set({ busy: { ...get().busy, workspace: false } });
+    }
   },
 
   setView: (view) => set({ view }),
@@ -971,7 +1060,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       const detail = await ipc.documentImport(path, get().currentProject?.project.id);
       set({ currentDocument: detail, view: "documents" });
       await get().loadDocuments();
-      get().toast("success", get().settings?.locale === "en" ? "Document imported" : "文档已导入");
+      get().toast(
+        "success",
+        get().settings?.locale === "en" ? "Document imported" : "文档已导入",
+        detail.document.path,
+      );
     } catch (error) {
       const e = errorToast(error);
       get().toast("error", e.message, e.detail);

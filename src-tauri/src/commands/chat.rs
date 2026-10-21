@@ -68,8 +68,7 @@ pub async fn chat_regenerate(
     let project_id = card.project_id.clone().unwrap_or_default();
     let model_profile_id = input.model_profile_id.unwrap_or_else(|| {
         inner
-            .settings
-            .read()
+            .settings_state()
             .settings
             .model_assignments
             .chat
@@ -111,11 +110,12 @@ fn start_chat(
     if card.locked {
         return Err(AppError::new("invalid_input", "卡片已锁定，无法发送"));
     }
-    let (profile_node, model) = inner.model_profile(&input.model_profile_id)?;
+    let profile = inner.model_profile(&input.model_profile_id)?;
+    let model = profile.data.clone();
     let key = if model.provider == "mock" {
         None
     } else {
-        let key = inner.api_key(&profile_node.id)?;
+        let key = inner.api_key(&profile.id)?;
         if key.is_none() {
             return Err(AppError::new("key_missing", "这个模型还没有设置 API Key"));
         }
@@ -125,12 +125,14 @@ fn start_chat(
         return Err(AppError::invalid("消息不能为空"));
     }
 
+    let locale = inner.settings_state().settings.locale;
     let compiled = context::compile(
         &inner.store,
         &input.card_id,
         &input.content,
         &model,
         &input.context,
+        &locale,
     )?;
 
     let turn_index = inner
@@ -301,8 +303,7 @@ fn start_chat(
     let run_id_task = run_id.clone();
     let run_node_id = run.id.clone();
     let checkpoint_ms = inner
-        .settings
-        .read()
+        .settings_state()
         .settings
         .auto_behavior
         .checkpoint_ms

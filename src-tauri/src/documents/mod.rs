@@ -2,6 +2,7 @@ use crate::domain::dto::{ChunkDto, ChunkMatch, DocumentDetail, DocumentSummary};
 use crate::domain::model::{now_ms, Edge, EdgeRelation, Node, NodeType};
 use crate::error::{AppError, AppResult};
 use crate::store::Store;
+use crate::workspace::Workspace;
 use regex::Regex;
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -278,12 +279,15 @@ fn chunk_text(text: &str, page: Option<u32>, heading: Option<String>) -> Vec<Par
 }
 
 pub fn import_document(
+    workspace: &Workspace,
     store: &Store,
     path: &Path,
     project_id: Option<String>,
 ) -> AppResult<DocumentDetail> {
-    let parsed = parse_file(path)?;
-    let bytes = std::fs::read(path)?;
+    let path = workspace.copy_external(path)?;
+    let relative = workspace.relative_path(&path)?;
+    let parsed = parse_file(&path)?;
+    let bytes = std::fs::read(&path)?;
     let hash = hex::encode(Sha256::digest(&bytes));
     let document = Node::new(
         NodeType::Document,
@@ -292,6 +296,7 @@ pub fn import_document(
         "",
         json!({
             "fileName": parsed.file_name,
+            "path": relative.clone(),
             "mime": parsed.mime,
             "pages": parsed.pages,
             "hash": hash,
@@ -308,6 +313,7 @@ pub fn import_document(
             &chunk.text,
             json!({
                 "documentId": document.id,
+                "path": relative.clone(),
                 "index": index,
                 "page": chunk.page,
                 "heading": chunk.heading,
@@ -330,6 +336,7 @@ pub fn import_document(
 pub async fn import_url(
     client: &reqwest::Client,
     store: &Store,
+    workspace: &Workspace,
     url: &str,
     project_id: Option<String>,
 ) -> AppResult<DocumentDetail> {
@@ -365,13 +372,16 @@ pub async fn import_url(
         .unwrap_or_else(|| document.root_element().text().collect::<Vec<_>>().join("\n"));
     let chunks = chunk_text(&text, None, None);
     let hash = hex::encode(Sha256::digest(html.as_bytes()));
+    let saved = workspace.write_attachment(&format!("web-{}.html", &hash[..8]), html.as_bytes())?;
+    let relative = workspace.relative_path(&saved)?;
     let doc_node = Node::new(
         NodeType::Document,
         project_id.clone(),
         title,
         "",
         json!({
-            "fileName": parsed_url.as_str(),
+            "fileName": saved.file_name().map(|value| value.to_string_lossy().to_string()).unwrap_or_else(|| parsed_url.as_str().to_string()),
+            "path": relative.clone(),
             "mime": "text/html",
             "pages": 0,
             "hash": hash,
@@ -388,6 +398,7 @@ pub async fn import_url(
             &chunk.text,
             json!({
                 "documentId": doc_node.id,
+                "path": relative.clone(),
                 "index": index,
                 "page": chunk.page,
                 "heading": chunk.heading,
@@ -413,6 +424,7 @@ pub fn document_summary(node: &Node, chunks: usize) -> DocumentSummary {
         project_id: node.project_id.clone(),
         title: node.title.clone(),
         file_name: node.data_str("fileName").unwrap_or("").to_string(),
+        path: node.data_str("path").unwrap_or("").to_string(),
         mime: node.data_str("mime").unwrap_or("").to_string(),
         pages: node.data_i64("pages").unwrap_or(0) as u32,
         chunk_count: chunks,

@@ -3,6 +3,7 @@ import {
   Check,
   Database,
   ExternalLink,
+  FolderOpen,
   Gauge,
   KeyRound,
   Languages,
@@ -44,6 +45,7 @@ type Tab =
   | "auto"
   | "language"
   | "layout"
+  | "workspace"
   | "about";
 
 const TABS: Array<{ id: Tab; icon: React.ReactNode; key: string }> = [
@@ -58,6 +60,7 @@ const TABS: Array<{ id: Tab; icon: React.ReactNode; key: string }> = [
   { id: "auto", icon: <RotateCcw size={16} />, key: "settings.autoBehavior" },
   { id: "language", icon: <Languages size={16} />, key: "settings.language" },
   { id: "layout", icon: <LayoutDashboard size={16} />, key: "settings.layout" },
+  { id: "workspace", icon: <FolderOpen size={16} />, key: "settings.workspace" },
   { id: "about", icon: <Database size={16} />, key: "settings.about" },
 ];
 
@@ -284,6 +287,9 @@ export function SettingsModal() {
   const createSnapshot = useAppStore((s) => s.createSnapshot);
   const restoreSnapshot = useAppStore((s) => s.restoreSnapshot);
   const toast = useAppStore((s) => s.toast);
+  const boot = useAppStore((s) => s.boot);
+  const openWorkspace = useAppStore((s) => s.openWorkspace);
+  const openDefaultWorkspace = useAppStore((s) => s.openDefaultWorkspace);
 
   const [tab, setTab] = useState<Tab>("models");
   const [draft, setDraft] = useState<Settings | null>(settings);
@@ -344,6 +350,25 @@ export function SettingsModal() {
 
   const setField = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     patch((s) => ({ ...s, [key]: value }));
+  };
+
+  const chooseWorkspace = async () => {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: t("settings.workspace.change"),
+    });
+    if (typeof selected === "string") {
+      if (await openWorkspace(selected)) setOpen(false);
+    }
+  };
+
+  const chooseDefaultWorkspace = async () => {
+    if (await openDefaultWorkspace()) {
+      setOpen(false);
+      toast("success", t("settings.workspace.default"), t("settings.workspace.current"));
+    }
   };
 
   return (
@@ -762,6 +787,48 @@ export function SettingsModal() {
                   onChange={(value) => setField("layout", { ...current.layout, force2dTree: value })}
                   label={t("settings.layout.force2d")}
                 />
+              </section>
+            )}
+
+            {tab === "workspace" && (
+              <section className="settings-section">
+                <h2>{t("settings.workspace")}</h2>
+                <p className="settings-desc">{t("settings.workspace.subtitle")}</p>
+                <div className="workspace-card">
+                  <div className="workspace-block">
+                    <span>{t("settings.workspace.current")}</span>
+                    <strong>{boot?.workspace.root ?? "—"}</strong>
+                  </div>
+                  <div className="workspace-block">
+                    <span>{t("settings.workspace.dataDir")}</span>
+                    <code>{boot?.workspace.internal ?? "—"}</code>
+                  </div>
+                  <div className="workspace-actions">
+                    <Button variant="primary" onClick={() => void chooseWorkspace()}>
+                      <FolderOpen size={15} /> {t("settings.workspace.change")}
+                    </Button>
+                    <Button variant="ghost" onClick={() => void chooseDefaultWorkspace()}>
+                      <RotateCcw size={15} /> {t("settings.workspace.default")}
+                    </Button>
+                    <Button variant="ghost" onClick={() => void ipc.openDataDir()}>
+                      <ExternalLink size={15} /> {t("settings.workspace.open")}
+                    </Button>
+                  </div>
+                </div>
+                <div className="workspace-access">
+                  <span>{t("settings.workspace.access")}</span>
+                  <button type="button" className="access-pill is-active">
+                    {t("settings.workspace.rw")}
+                  </button>
+                  <button type="button" className="access-pill" disabled>
+                    {t("settings.workspace.ro")}
+                  </button>
+                  <button type="button" className="access-pill" disabled>
+                    {t("settings.workspace.full")}
+                  </button>
+                </div>
+                <p className="settings-desc">{t("settings.workspace.roadmap")}</p>
+                <p className="settings-desc">{t("settings.workspace.changeHint")}</p>
               </section>
             )}
 

@@ -74,34 +74,27 @@ pub async fn knowledge_check(
     let knowledge = service::knowledge_get(&inner.store, &input.id)?;
     let model_id = input.model_profile_id.or_else(|| {
         inner
-            .settings
-            .read()
+            .settings_state()
             .settings
             .model_assignments
             .chat
             .clone()
     });
-    let (profile_node, model) = match model_id {
+    let profile = match model_id {
         Some(id) => inner.model_profile(&id)?,
         None => {
-            let node = inner
-                .store
-                .state()
-                .read()
-                .nodes
-                .values()
-                .find(|node| {
-                    node.node_type == crate::domain::model::NodeType::ModelProfile
-                        && node.data_str("provider") == Some("mock")
-                })
+            let config = inner.config.read();
+            config
+                .model_profiles
+                .iter()
+                .find(|profile| profile.data.provider == "mock")
+                .or_else(|| config.model_profiles.first())
                 .cloned()
-                .ok_or_else(|| crate::error::AppError::new("model_not_configured", "没有可用模型"))?;
-            let data = serde_json::from_value::<ModelProfileData>(node.data.clone())
-                .map_err(|e| crate::error::AppError::parse(e.to_string()))?;
-            (node, data)
+                .ok_or_else(|| crate::error::AppError::new("model_not_configured", "没有可用模型"))?
         }
     };
-    let key = inner.api_key(&profile_node.id)?;
+    let model = profile.data.clone();
+    let key = inner.api_key(&profile.id)?;
     let prompt = format!(
         "请检查下面这条知识条目是否清晰、准确、可引用。指出偏差、遗漏与一个可验证的下一步。\n\n标题：{}\n\n正文：\n{}",
         knowledge.title, knowledge.body
@@ -119,6 +112,6 @@ pub async fn knowledge_check(
     .await?;
     Ok(KnowledgeCheckResult {
         feedback: outcome.text,
-        model_profile_id: profile_node.id,
+        model_profile_id: profile.id,
     })
 }

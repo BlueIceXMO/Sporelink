@@ -4,7 +4,7 @@ import path from "node:path";
 
 const cdp = process.env.DSH_WEBVIEW_CDP || "http://127.0.0.1:9222";
 const outDir = process.env.SMOKE_OUT || "artifacts";
-const dataDir = process.env.SPORELINK_DATA_DIR || "D:/Documents/VibeProjects/Sporelink_ws/.data/sporelink-smoke";
+const dataDir = process.env.SMOKE_DATA || "D:/Documents/VibeProjects/Sporelink_ws/.data/sporelink-smoke";
 
 fs.mkdirSync(dataDir, { recursive: true });
 fs.mkdirSync(outDir, { recursive: true });
@@ -49,6 +49,15 @@ const context = await invoke("context_preview", {
 const search = await invoke("search", { input: { query: "上下文", limit: 20 } });
 const doc = await invoke("document_import", { path: markdownPath, projectId: project.id });
 const docs = await invoke("document_list", { projectId: project.id });
+const workspace = await invoke("workspace_info");
+const workspaceFiles = await invoke("workspace_file_list");
+const documentText = await invoke("workspace_read_file", { path: doc.document.path });
+let internalReadRejected = false;
+try {
+  await invoke("workspace_read_file", { path: ".spore/workspace.json" });
+} catch {
+  internalReadRejected = true;
+}
 const knowledge = await invoke("knowledge_list", { projectId: project.id });
 const exportPath = path.join(dataDir, "smoke-export.json");
 await invoke("vault_export", { path: exportPath });
@@ -99,6 +108,12 @@ const summary = {
   documentId: doc.document.id,
   documentChunks: doc.chunks.length,
   documentListCount: docs.length,
+  documentPath: doc.document.path,
+  workspaceInternal: workspace.internal,
+  workspaceFiles: workspaceFiles.length,
+  workspaceLeaksSpore: workspaceFiles.some((file) => file.path.includes(".spore")),
+  documentReadable: documentText.includes("Smoke document"),
+  internalReadRejected,
   knowledgeCount: knowledge.length,
   exportNodes: exported.nodes.length,
   exportHasSecret: /sk-|apiKey|authorization/i.test(exportedText),
@@ -122,6 +137,10 @@ if (dive.card.surfaceKind !== "dive") throw new Error("dive surface wrong");
 if (context.items.length === 0) throw new Error("context empty");
 if (search.hits.length === 0) throw new Error("search empty");
 if (doc.chunks.length === 0) throw new Error("document chunks empty");
+if (!doc.document.path) throw new Error("document workspace path missing");
+if (workspaceFiles.some((file) => file.path.includes(".spore"))) throw new Error("workspace leaked .spore");
+if (!documentText.includes("Smoke document")) throw new Error("workspace file not readable");
+if (!internalReadRejected) throw new Error("internal .spore file was readable");
 if (exported.nodes.length === 0) throw new Error("export empty");
 if (exportedProject.nodes.length === 0) throw new Error("project export empty");
 if (importedProject.project.cardCount === 0) throw new Error("project import empty");

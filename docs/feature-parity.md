@@ -190,3 +190,17 @@ Sporelink 不复制 Explore 的卡片类型字段。所有业务内容都是 `No
 | 12.3 | 绕过 Explore 鉴权/付费/额度 | 不实现 |
 | 12.4 | 复制 Explore 代码/素材/字体/图标/文案/提示词/品牌 | 不实现；示例文案原创 |
 | 12.5 | 浏览器版 / 本地 HTTP 服务 / Node runtime | 不实现 |
+
+## 13. 工作区与主数据
+
+| # | 需求 | Sporelink 实现 | 验收方式 | 状态 |
+| --- | --- | --- | --- | --- |
+| 13.1 | 主数据跟随工作区 | `<workspace>/.spore/`：workspace.json、VelesDB、snapshots、logs | 自动 + 手动 | 完成 |
+| 13.2 | 默认工作区 | `Documents/Sporelink`，可更换与恢复默认 | 手动 | 完成 |
+| 13.3 | 打开/新建统一入口 | `workspace_open`：有 `.spore` 打开，无则创建 | API 冒烟 | 完成 |
+| 13.4 | 应用配置独立 | `~/.sporelink/config.json`；Key 仍在 keychain | 手动 | 完成 |
+| 13.5 | `.spore` 隔离 | 文件列表/读取/文档导入/搜索/AI 文件视野硬过滤 | API 测试 | 完成 |
+| 13.6 | 工作区外文件显式导入 | 复制到 `<workspace>/attachments/` 后再索引 | API 测试 | 完成 |
+| 13.7 | AI 文件引用 | 上下文只放 `path#locator`，提供 `workspace_read_file` 命令 | 手动 | 进行中 |
+| 13.8 | 权限模式 | 当前仅 rw；ro/full 配置与 UI 占位 | 手动 | 占位 |
+| 13.9 | 工作区整体迁移 | 直接复制文件夹后重新打开；未做归档导出 | 手动 | 进行中 |

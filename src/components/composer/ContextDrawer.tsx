@@ -86,6 +86,7 @@ export function ContextDrawer() {
                       <span className="context-tokens">{formatTokens(item.tokens)} tok</span>
                     </div>
                     <div className="context-title">{item.title}</div>
+                    {item.path && <code className="context-path">{item.path}</code>}
                     <div className="context-reason">{item.reason}</div>
                     {item.droppedReason && <div className="context-dropped-reason">{item.droppedReason}</div>}
                   </div>

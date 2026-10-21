@@ -66,18 +66,27 @@ Rust commands
 ### 3.2 数据目录
 
 ```text
-<app_data>/
-  app.json                 # 仅 bootstrap：vault 路径、schema 版本
-  vaults/default/
-    db/                    # VelesDB
-    attachments/<sha256>   # 附件内容寻址
-    snapshots/<id>/        # 全量 JSON 快照
-  logs/startup.log         # 启动路径与错误，不含正文/Key
+~/.sporelink/                # 应用配置，不随工作区迁移
+  config.json                # activeWorkspace、recentWorkspaces、主题/语言/布局、
+                             # 模型 profiles、访问模式、ignore 规则
+  logs/startup.log
+  webview2/
+
+<workspace>/                 # 默认 Documents/Sporelink，可配置
+  .spore/
+    workspace.json           # id、name、schemaVersion、createdAt
+    db/                      # VelesDB
+    snapshots/               # 全量 JSON 快照
+    logs/
+  attachments/               # 显式导入的工作区外文件
+  papers/ ...                # 用户原始资料，原地保留
 ```
 
-`app.json` 只用于打开 Vault，不存业务内容。
-
-路径选择是自愈的：优先 `%APPDATA%\Sporelink`，不可写时回退 `%LOCALAPPDATA%\Sporelink`，再回退 exe 同级 `SporelinkData`。WebView2 profile 同样优先 `%LOCALAPPDATA%\Sporelink\WebView2`，再回退到 `SporelinkData\WebView2`。启动日志写在这些目录的 `logs/startup.log`。这样双击运行不依赖外部环境变量。
+- 原始文档/附件留在工作区，不复制进 `.spore`；`.spore/db` 只存路径、hash、chunk 引用与本地搜索索引。
+- `.spore` 与 `.sporelink` 在扫描、搜索、文件列表、AI 文件读取中硬过滤。
+- 当前只启用“仅工作区读写”；`ro` / `full` 是配置里预留的后续模式。
+- 路径逻辑边界：canonicalize + 工作区前缀 + 拒绝 `..`/symlink 逃逸；不修改系统 ACL。
+- WebView2 profile 在 `~/.sporelink/webview2`，双击运行不依赖外部环境变量。
 
 ### 3.3 不变量
 

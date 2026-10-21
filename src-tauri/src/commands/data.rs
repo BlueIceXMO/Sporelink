@@ -19,7 +19,12 @@ pub fn document_import(
     project_id: Option<String>,
 ) -> AppResult<DocumentDetail> {
     let inner = state.inner().inner()?;
-    crate::documents::import_document(&inner.store, Path::new(&path), project_id)
+    crate::documents::import_document(
+        &inner.workspace,
+        &inner.store,
+        Path::new(&path),
+        project_id,
+    )
 }
 
 #[tauri::command]
@@ -29,7 +34,14 @@ pub async fn document_import_url(
     project_id: Option<String>,
 ) -> AppResult<DocumentDetail> {
     let inner = state.inner().inner()?;
-    crate::documents::import_url(&inner.http, &inner.store, &url, project_id).await
+    crate::documents::import_url(
+        &inner.http,
+        &inner.store,
+        &inner.workspace,
+        &url,
+        project_id,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -80,9 +92,7 @@ pub fn vault_import(
     let value = export::read_json(Path::new(&path))?;
     if mode == "replace" {
         inner.store.clear_all()?;
-        let result = service::import_graph(&inner.store, &value, None)?;
-        let _ = inner.reload_settings();
-        Ok(result)
+        service::import_graph(&inner.store, &value, None)
     } else {
         service::import_graph(&inner.store, &value, None)
     }
@@ -95,7 +105,6 @@ pub fn vault_clear(state: State<'_, AppState>, confirm: String) -> AppResult<()>
     }
     let inner = state.inner().inner()?;
     inner.store.clear_all()?;
-    let _ = inner.reload_settings();
     Ok(())
 }
 
@@ -105,20 +114,19 @@ pub fn snapshot_create(
     label: Option<String>,
 ) -> AppResult<SnapshotSummary> {
     let inner = state.inner().inner()?;
-    service::snapshot_create(&inner.data_dir, &inner.store, label)
+    service::snapshot_create(&inner.workspace, &inner.store, label)
 }
 
 #[tauri::command]
 pub fn snapshot_list(state: State<'_, AppState>) -> AppResult<Vec<SnapshotSummary>> {
     let inner = state.inner().inner()?;
-    Ok(service::snapshot_list(&inner.data_dir))
+    Ok(service::snapshot_list(&inner.workspace))
 }
 
 #[tauri::command]
 pub fn snapshot_restore(state: State<'_, AppState>, id: String) -> AppResult<()> {
     let inner = state.inner().inner()?;
-    service::snapshot_restore(&inner.data_dir, &inner.store, &id)?;
-    let _ = inner.reload_settings();
+    service::snapshot_restore(&inner.workspace, &inner.store, &id)?;
     Ok(())
 }
 

@@ -3,118 +3,13 @@ use crate::domain::dto::*;
 use crate::domain::model::*;
 use crate::error::{AppError, AppResult};
 use crate::export;
-use crate::keychain::Keychain;
-
-
-use crate::state::{mock_profile, AppInner, SettingsCache};
+use crate::state::AppInner;
 use crate::store::Store;
+use crate::workspace::Workspace;
 
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
-
-
-// ---------------------------------------------------------------------------
-// Seed / settings
-// ---------------------------------------------------------------------------
-
-pub fn ensure_seed(store: &Store, _keychain: &Keychain) -> AppResult<(SettingsCache, Vec<ModelProfileDto>)> {
-    let settings_node = if let Some(node) = store
-        .find_single_by_type(NodeType::Settings)
-        .filter(Node::is_live)
-    {
-        node
-    } else {
-        store.put_node(
-            Node::new(
-                NodeType::Settings,
-                None,
-                "Settings",
-                "",
-                serde_json::to_value(Settings::default())?,
-            ),
-            None,
-        )?
-    };
-
-    let mut settings = serde_json::from_value::<Settings>(settings_node.data.clone())
-        .unwrap_or_else(|_| Settings::default());
-
-    let existing_mock = {
-        let state = store.state().read();
-        state
-            .nodes
-            .values()
-            .find(|node| {
-                node.node_type == NodeType::ModelProfile
-                    && node.is_live()
-                    && node.data_str("provider") == Some("mock")
-            })
-            .cloned()
-    };
-    let mock = if let Some(node) = existing_mock {
-        node
-    } else {
-        store.put_node(
-            Node::new(
-                NodeType::ModelProfile,
-                None,
-                "Mock (offline)",
-                "",
-                serde_json::to_value(mock_profile())?,
-            ),
-            None,
-        )?
-    };
-
-    if settings.model_assignments.chat.is_none() {
-        settings.model_assignments.chat = Some(mock.id.clone());
-    }
-    if settings.model_assignments.summary.is_none() {
-        settings.model_assignments.summary = Some(mock.id.clone());
-    }
-    if settings.model_assignments.title.is_none() {
-        settings.model_assignments.title = Some(mock.id.clone());
-    }
-    let settings_node = if settings_node.data != serde_json::to_value(&settings)? {
-        let mut node = settings_node.clone();
-        node.data = serde_json::to_value(&settings)?;
-        store.put_node(node, Some(settings_node.revision))?
-    } else {
-        settings_node
-    };
-
-    let models = list_model_profiles(store)?;
-    Ok((
-        SettingsCache {
-            settings,
-            node_id: settings_node.id,
-            revision: settings_node.revision,
-        },
-        models,
-    ))
-}
-
-pub fn list_model_profiles(store: &Store) -> AppResult<Vec<ModelProfileDto>> {
-    let mut models = store
-        .state()
-        .read()
-        .nodes
-        .values()
-        .filter(|node| node.node_type == NodeType::ModelProfile && node.is_live())
-        .map(|node| {
-            let data = serde_json::from_value::<ModelProfileData>(node.data.clone())
-                .unwrap_or_else(|_| mock_profile());
-            ModelProfileDto {
-                id: node.id.clone(),
-                revision: node.revision,
-                data,
-            }
-        })
-        .collect::<Vec<_>>();
-    models.sort_by_key(|model| model.data.label.to_lowercase());
-    Ok(models)
-}
+use std::path::Path;
 
 // ---------------------------------------------------------------------------
 // Projects & folders
@@ -1227,13 +1122,16 @@ pub fn context_preview(
     inner: &AppInner,
     input: ContextPreviewInput,
 ) -> AppResult<ContextPreview> {
-    let (_, model) = inner.model_profile(&input.model_profile_id)?;
+    let profile = inner.model_profile(&input.model_profile_id)?;
+    let model = profile.data;
+    let locale = inner.settings_state().settings.locale;
     let compiled = context::compile(
         &inner.store,
         &input.card_id,
         &input.draft_content,
         &model,
         &input.context,
+        &locale,
     )?;
     Ok(context::preview_dto(&compiled, &input.model_profile_id))
 }
@@ -1450,34 +1348,28 @@ pub async fn project_summary_generate(
     }
     let model_id = model_profile_id.or_else(|| {
         inner
-            .settings
-            .read()
+            .settings_state()
             .settings
             .model_assignments
             .summary
             .clone()
     });
-    let (profile_node, model) = match model_id {
+    let profile = match model_id {
         Some(id) => inner.model_profile(&id)?,
         None => {
-            let mock = inner
-                .store
-                .state()
-                .read()
-                .nodes
-                .values()
-                .find(|node| {
-                    node.node_type == NodeType::ModelProfile
-                        && node.data_str("provider") == Some("mock")
-                })
+            let config = inner.config.read();
+            let profile = config
+                .model_profiles
+                .iter()
+                .find(|profile| profile.data.provider == "mock")
+                .or_else(|| config.model_profiles.first())
                 .cloned()
                 .ok_or_else(|| AppError::new("model_not_configured", "没有可用的摘要模型"))?;
-            let data = serde_json::from_value::<ModelProfileData>(mock.data.clone())
-                .map_err(|e| AppError::parse(e.to_string()))?;
-            (mock, data)
+            profile
         }
     };
-    let key = inner.api_key(&profile_node.id).ok().flatten();
+    let model = profile.data.clone();
+    let key = inner.api_key(&profile.id).ok().flatten();
     let messages = vec![context::ChatMessage {
         role: "user".into(),
         content: format!(
@@ -1757,10 +1649,12 @@ pub fn trash_restore(store: &Store, id: &str) -> AppResult<()> {
     Ok(())
 }
 
-pub fn snapshot_dir(data_dir: &Path) -> PathBuf {
-    data_dir.join("vaults").join("default").join("snapshots")
-}pub fn snapshot_create(data_dir: &Path, store: &Store, label: Option<String>) -> AppResult<SnapshotSummary> {
-    let dir = snapshot_dir(data_dir);
+pub fn snapshot_create(
+    workspace: &Workspace,
+    store: &Store,
+    label: Option<String>,
+) -> AppResult<SnapshotSummary> {
+    let dir = workspace.snapshot_dir();
     std::fs::create_dir_all(&dir)?;
     let id = new_id();
     let created_at = now_ms();
@@ -1779,7 +1673,6 @@ pub fn snapshot_dir(data_dir: &Path) -> PathBuf {
     };
     let manifest = serde_json::to_string_pretty(&summary)?;
     std::fs::write(dir.join(format!("{id}.meta.json")), manifest)?;
-    // Keep only the 10 most recent snapshots.
     let mut files = std::fs::read_dir(&dir)?
         .filter_map(|entry| entry.ok())
         .filter(|entry| entry.file_name().to_string_lossy().ends_with(".meta.json"))
@@ -1798,8 +1691,8 @@ pub fn snapshot_dir(data_dir: &Path) -> PathBuf {
     Ok(summary)
 }
 
-pub fn snapshot_list(data_dir: &Path) -> Vec<SnapshotSummary> {
-    let dir = snapshot_dir(data_dir);
+pub fn snapshot_list(workspace: &Workspace) -> Vec<SnapshotSummary> {
+    let dir = workspace.snapshot_dir();
     let mut snapshots = std::fs::read_dir(dir)
         .map(|entries| {
             entries
@@ -1816,8 +1709,8 @@ pub fn snapshot_list(data_dir: &Path) -> Vec<SnapshotSummary> {
     snapshots
 }
 
-pub fn snapshot_restore(data_dir: &Path, store: &Store, id: &str) -> AppResult<()> {
-    let path = snapshot_dir(data_dir).join(format!("{id}.json"));
+pub fn snapshot_restore(workspace: &Workspace, store: &Store, id: &str) -> AppResult<()> {
+    let path = workspace.snapshot_dir().join(format!("{id}.json"));
     let value = export::read_json(&path)?;
     let (nodes, edges, _) = parse_import_payload(&value)?;
     store.replace_all(nodes, edges)?;

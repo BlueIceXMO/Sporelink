@@ -59,22 +59,26 @@ npm run api-smoke   # 图、搜索、文档、知识、摘要、导出、导入�
 
 `scripts/*.mjs` 通过 `DSH_WEBVIEW_CDP`（默认 `http://127.0.0.1:9222`）连接 WebView2；只用于本地验证，不是产品依赖。
 
-默认数据目录由 Tauri 的 `app_data_dir` 决定。调试时可以用环境变量覆盖：
+应用配置默认在 `~/.sporelink/`（Windows `C:\Users\<user>\.sporelink\`）。调试时可用环境变量覆盖：
 
 ```bash
-SPORELINK_DATA_DIR=D:\path\to\sporelink-data
+SPORELINK_CONFIG_DIR=D:\path\to\sporelink-config
+SPORELINK_WORKSPACE=D:\path\to\workspace
 ```
 
 ## 数据与安全
 
-- 默认业务数据目录：`%APPDATA%\Sporelink`；如果该位置不可写，回退到 `%LOCALAPPDATA%\Sporelink`，再回退到 exe 同级的 `SporelinkData`。
-- WebView2 profile 同样按 `%LOCALAPPDATA%\Sporelink\WebView2` → `SporelinkData\WebView2` 回退。
-- 启动失败时查看 `logs\startup.log`（在上述任一数据目录下）；里面只记路径与错误码，不记消息正文或 Key。
+- 主数据：`<workspace>/.spore/`，默认工作区是 `Documents\Sporelink`；可自由更换。
+- 配置：`~/.sporelink/config.json`，包括当前/最近工作区、主题、语言、布局、模型 profile 与访问模式。
+- WebView2 profile：`~/.sporelink/webview2`。
+- 启动失败时查看 `~/.sporelink/logs/startup.log`；里面只记路径与错误码，不记消息正文或 Key。
+- 原始文档/附件留在工作区，不复制进 `.spore`；工作区外文件显式导入时复制到 `<workspace>/attachments/`。
+- `.spore` 与 `.sporelink` 对文件扫描、搜索、AI 文件读取全部隐藏。
+- 当前访问模式只有“仅工作区读写”；只读与完全权限是后续规划。
 - 业务数据只写入本地 VelesDB；没有账号、云同步、遥测、远程配置或自动更新。
 - API Key 只存在 OS keychain；前端只能读取“已设置/未设置”，没有读取 Key 的 IPC。
 - 导出不含 Key；导出前会递归剔除 `apiKey`、`authorization`、`secret` 等字段。
 - 模型请求由 Rust 直连用户配置的供应商；自定义 Base URL 需要用户确认。
-- 附件按 SHA-256 内容寻址存放在 Vault 目录；元数据在 VelesDB。
 
 ## 目录
 

@@ -128,8 +128,8 @@ export function DocumentView() {
               <span className="document-row-main">
                 <strong>{doc.title}</strong>
                 <small>
-                  {doc.pages > 0 ? t("documents.pages", { count: doc.pages }) : doc.fileName} ·{" "}
-                  {t("documents.chunks", { count: doc.chunkCount })}
+                  {doc.path || doc.fileName} ·{" "}
+                  {doc.pages > 0 ? t("documents.pages", { count: doc.pages }) : t("documents.chunks", { count: doc.chunkCount })}
                 </small>
               </span>
             </button>
@@ -160,7 +160,7 @@ export function DocumentView() {
               <div>
                 <h1>{currentDocument.document.title}</h1>
                 <p>
-                  {currentDocument.document.fileName} ·{" "}
+                  {currentDocument.document.path || currentDocument.document.fileName} ·{" "}
                   {currentDocument.document.pages > 0
                     ? t("documents.pages", { count: currentDocument.document.pages })
                     : t("documents.chunks", { count: currentDocument.document.chunkCount })}{" "}

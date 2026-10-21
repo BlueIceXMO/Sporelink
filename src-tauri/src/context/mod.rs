@@ -190,6 +190,7 @@ fn make_item(
         reason: reason.into(),
         included: false,
         dropped_reason: None,
+        path: None,
     }
 }
 
@@ -199,6 +200,7 @@ pub fn compile(
     draft: &str,
     model: &ModelProfileData,
     options: &ContextOptions,
+    locale: &str,
 ) -> AppResult<CompiledContext> {
     let path = card_path(store, card_id)?;
     let current = path.last().ok_or_else(|| AppError::not_found("card"))?;
@@ -233,7 +235,7 @@ pub fn compile(
     let budget = (model.context_window.saturating_sub(model.max_output)).max(1024) as u64;
     let mut items: Vec<ContextItem> = Vec::new();
 
-    let base_prompt = system_prompt(model, &options_locale(store));
+    let base_prompt = system_prompt(model, locale);
     let mut system_tokens = estimate_tokens(&base_prompt);
     let draft_text = truncate_to_tokens(draft, budget / 2);
     let draft_item = make_item(
@@ -253,6 +255,7 @@ pub fn compile(
         reason: "模型角色、语言与本地优先约束".into(),
         included: true,
         dropped_reason: None,
+        path: None,
     };
     items.push(system_item);
 
@@ -309,15 +312,30 @@ pub fn compile(
     for id in &options.document_chunk_ids {
         if let Some(node) = store.live_node(id) {
             if node.node_type == NodeType::Chunk {
-                chunks.push(node.clone());
-                items.push(make_item(
-                    format!("document:{}", node.id),
-                    "document",
-                    &node.id,
-                    format!("Document chunk {}", first_line(&node.body, 30)),
-                    &node.body,
-                    "用户选中的文档片段",
-                ));
+                let path = node.data_str("path").unwrap_or("").to_string();
+                let locator = node
+                    .data_i64("page")
+                    .map(|page| format!("p{page}"))
+                    .or_else(|| node.data_str("heading").map(str::to_string))
+                    .unwrap_or_else(|| format!("#{}", node.data_i64("index").unwrap_or(0) + 1));
+                let reference = if path.is_empty() {
+                    format!("workspace://chunk/{}", node.id)
+                } else {
+                    format!("{path}#{locator}")
+                };
+                let title = reference.clone();
+                chunks.push((node.clone(), reference.clone()));
+                items.push(ContextItem {
+                    id: format!("document:{}", node.id),
+                    kind: "document".into(),
+                    source_id: node.id.clone(),
+                    title,
+                    tokens: 16,
+                    reason: "用户选中的工作区文件引用".into(),
+                    included: false,
+                    dropped_reason: None,
+                    path: if path.is_empty() { None } else { Some(path) },
+                });
             }
         }
     }
@@ -404,14 +422,18 @@ pub fn compile(
     }
     if chunks
         .iter()
-        .any(|node| is_included(&format!("document:{}", node.id)))
+        .any(|(node, _)| is_included(&format!("document:{}", node.id)))
     {
-        system.push_str("\n\n## Selected document chunks\n");
-        for node in &chunks {
+        system.push_str("\n\n## Selected workspace file references\n");
+        system.push_str(
+            "These are workspace paths and locators, not file contents. Use the read-only workspace_read_file tool with a path and optional line range to read them.\n",
+        );
+        for (node, reference) in &chunks {
             if is_included(&format!("document:{}", node.id)) {
-                system.push_str(&format!("\n### Chunk\n{}\n", node.body));
+                system.push_str(&format!("\n- {reference}"));
             }
         }
+        system.push('\n');
     }
     system_tokens = estimate_tokens(&system);
     total = total
@@ -462,14 +484,6 @@ pub fn compile(
         items,
         system_prompt: system,
     })
-}
-
-fn options_locale(store: &Store) -> String {
-    store
-        .find_single_by_type(NodeType::Settings)
-        .and_then(|node| serde_json::from_value::<crate::domain::dto::Settings>(node.data).ok())
-        .map(|settings| settings.locale)
-        .unwrap_or_else(|| "zh-CN".into())
 }
 
 fn system_prompt(model: &ModelProfileData, locale: &str) -> String {

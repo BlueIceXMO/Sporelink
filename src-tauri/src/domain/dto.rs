@@ -504,6 +504,7 @@ pub struct ContextItem {
     pub reason: String,
     pub included: bool,
     pub dropped_reason: Option<String>,
+    pub path: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -676,6 +677,7 @@ pub struct DocumentSummary {
     pub project_id: Option<String>,
     pub title: String,
     pub file_name: String,
+    pub path: String,
     pub mime: String,
     pub pages: u32,
     pub chunk_count: usize,
@@ -811,6 +813,27 @@ pub struct VaultInfo {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct WorkspaceInfo {
+    pub id: String,
+    pub name: String,
+    pub root: String,
+    pub internal: String,
+    pub access: String,
+    pub created_at: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceFile {
+    pub path: String,
+    pub name: String,
+    pub size: u64,
+    pub is_dir: bool,
+    pub modified_at: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct Counts {
     pub projects: usize,
     pub cards: usize,
@@ -839,6 +862,7 @@ pub struct Diagnostics {
 pub struct Bootstrap {
     pub version: String,
     pub vault: VaultInfo,
+    pub workspace: WorkspaceInfo,
     pub settings: Settings,
     pub settings_revision: u64,
     pub projects: Vec<ProjectSummary>,

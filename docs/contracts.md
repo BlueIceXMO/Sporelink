@@ -11,8 +11,7 @@ type Node = {
   id: string;
   nodeType:
     | "project" | "folder" | "card" | "turn" | "message"
-    | "document" | "chunk" | "knowledge" | "attachment"
-    | "settings" | "model_profile" | "run";
+    | "document" | "chunk" | "knowledge" | "attachment" | "run";
   projectId: string | null;
   title: string;
   body: string;
@@ -83,9 +82,17 @@ Rust 的 `classify_card(card_id)` 只读图：
 - 当前卡若有 `branch_of` 或 `derives_from` 边，读取 `metadata.contextCutMessageId` / `sourceMessageId`；祖先卡只取到该消息。
 - `parallel_to` 不改变路径，只改变 3D 布局与表层标签。
 - 当前卡自己的消息永远包含；最后一条用户消息永远保留。
+- 选中的文档 chunk 在上下文里只产生 `kind: "document"` + `path` + `path#locator` 引用，不把全文塞入 system prompt；模型通过只读 `workspace_read_file` 工具按需读取。
 
 ## 2. 存储
 
+- 应用配置：`~/.sporelink/config.json`（Windows `C:\Users\<user>\.sporelink\`）。主题、语言、引导、窗口/布局、模型 profile、当前/最近工作区、访问模式、ignore 规则都在这里；API Key 仍只存 OS keychain。
+- 主数据：`<workspace>/.spore/`：
+  - `workspace.json`：id、name、schemaVersion、createdAt
+  - `db/`：VelesDB
+  - `snapshots/`：工作区快照
+  - `logs/`
+  - `.lock`：单实例锁（后续）
 - VelesDB `velesdb-core` 6.x，metadata-only collections：
   - `sporelink_nodes`
   - `sporelink_edges`
@@ -95,7 +102,8 @@ Rust 的 `classify_card(card_id)` 只读图：
 - 写入只经单一 `StoreWriter`；读走 `RwLock<GraphState>` 快照。
 - 流式助手消息按 `checkpointMs` 检查点落盘；取消/失败保留已生成内容。
 - 退出、导入、快照前 `flush_all()`。
-- 附件文件放 `attachments/<sha256>`；附件元数据是 `attachment` 节点。
+- 原始文档、附件留在工作区路径，不复制进 `.spore`；`.spore` 只存路径/hash/chunk 引用与索引。工作区外文件显式导入时复制到 `<workspace>/attachments/`。
+- `.spore` 与 `.sporelink` 永远不作为用户文件或 AI 文件；扫描、搜索、列表、工具读取都排除。
 
 ## 3. IPC 命令
 
@@ -107,11 +115,20 @@ Rust 的 `classify_card(card_id)` 只读图：
 | --- | --- | --- |
 | `bootstrap` | 无 | `Bootstrap` |
 | `settings_get` | 无 | `Settings` |
-| `settings_update` | `{ patch, expectedRevision }` | `Settings` |
+| `settings_update` | `{ settings, expectedRevision }` | `Settings` |
 | `diagnostics` | 无 | `Diagnostics` |
 | `open_data_dir` | 无 | `void` |
+| `workspace_info` | 无 | `WorkspaceInfo` |
+| `workspace_open` | `{ path }` | `Bootstrap` |
+| `workspace_default` | 无 | `Bootstrap` |
+| `workspace_file_list` | 无 | `WorkspaceFile[]` |
+| `workspace_read_file` | `{ path, startLine?, endLine? }` | `string` |
 
-`Bootstrap`：`version`、`vault`、`settings`、`projects`、`folders`、`models`、`counts`、`keychainAvailable`。
+`Bootstrap`：`version`、`vault`、`workspace`、`settings`、`projects`、`folders`、`models`、`counts`、`keychainAvailable`。
+
+`WorkspaceInfo`：`id`、`name`、`root`、`internal`、`access`、`createdAt`。`WorkspaceFile`：`path`、`name`、`size`、`isDir`、`modifiedAt`。
+
+`workspace_open` 是“打开或新建”统一入口：路径下已有 `.spore/workspace.json` 则打开，否则初始化 `.spore/`。当前只实现 `rw`；`ro` / `full` 是后续权限模式，配置已预留。
 
 ### 3.2 项目 / 文件夹
 
@@ -216,6 +233,8 @@ Rust 的 `classify_card(card_id)` 只读图：
 | `document_get` | `{ id }` | `DocumentDetail` |
 | `document_delete` | `{ id }` | `void` |
 | `document_search` | `{ id, query }` | `ChunkMatch[]` |
+
+`DocumentSummary` 增加 `path`（工作区相对路径）。`document_import` 对工作区内文件原地索引；工作区外文件先复制到 `<workspace>/attachments/` 再索引，不保留工作区外读取权限。`.spore` 内文件拒绝导入。文档原文不复制进 `.spore`；chunk 文本只作为本地搜索索引，AI 上下文只拿 `path#locator` 引用。
 
 ### 3.7 知识
 
@@ -322,7 +341,7 @@ type AppError = {
 }
 ```
 
-- 导出包含 `model_profile` 节点，但绝不含 Key。
+- 导出不含 Key、`settings` 或 `model_profile`（后两者是 `~/.sporelink/config.json` 中的应用配置）。
 - 导入时若 ID 冲突，重新分配节点/边 ID 并重建内部引用。
 - 导入先校验格式与版本，再写临时图，最后原子替换/合并；失败不破坏现有数据。
 - 不导入 `run`、`settings` 节点（运行时/本机设置）。

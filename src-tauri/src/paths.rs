@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
-const APP_DIR: &str = "Sporelink";
-const TAURI_IDENTIFIER: &str = "com.sporelink.desktop";
+fn home_dir() -> PathBuf {
+    dirs::home_dir().unwrap_or_else(|| PathBuf::from("."))
+}
 
 fn exe_dir() -> PathBuf {
     std::env::current_exe()
@@ -21,40 +22,66 @@ fn first_writable(candidates: Vec<PathBuf>, fallback_name: &str) -> PathBuf {
     fallback
 }
 
-/// Business data directory. Prefer `SPORELINK_DATA_DIR`, then the OS data dir,
-/// then a portable folder next to the executable, then temp.
-pub fn data_dir() -> PathBuf {
-    if let Ok(value) = std::env::var("SPORELINK_DATA_DIR") {
+/// Application-level configuration. Secrets stay in the OS keychain.
+pub fn config_dir() -> PathBuf {
+    if let Ok(value) = std::env::var("SPORELINK_CONFIG_DIR") {
         if !value.trim().is_empty() {
             return PathBuf::from(value);
         }
     }
-    let mut candidates = Vec::new();
-    if let Some(dir) = dirs::data_dir() {
-        candidates.push(dir.join(APP_DIR));
-    }
-    if let Some(dir) = dirs::data_local_dir() {
-        candidates.push(dir.join(APP_DIR));
-    }
-    candidates.push(exe_dir().join("SporelinkData"));
-    first_writable(candidates, "SporelinkData")
+    home_dir().join(".sporelink")
 }
 
-/// WebView2 profile directory. Tauri's default path is based on the bundle
-/// identifier and can be blocked by restrictive Windows folders; an explicit
-/// profile avoids a silent "app does not start" failure.
+fn documents_dir() -> PathBuf {
+    dirs::document_dir().unwrap_or_else(|| home_dir().join("Documents"))
+}
+
+fn push_unique(candidates: &mut Vec<PathBuf>, path: PathBuf) {
+    if !candidates.iter().any(|item| item == &path) {
+        candidates.push(path);
+    }
+}
+
+/// Candidate roots for the default workspace. The first one is the
+/// documented default; the rest are writability fallbacks for redirected or
+/// restricted Documents folders.
+pub fn default_workspace_candidates() -> Vec<PathBuf> {
+    if let Ok(value) = std::env::var("SPORELINK_WORKSPACE") {
+        if !value.trim().is_empty() {
+            return vec![PathBuf::from(value)];
+        }
+    }
+    let mut candidates = Vec::new();
+    push_unique(&mut candidates, documents_dir().join("Sporelink"));
+    push_unique(&mut candidates, home_dir().join("Documents").join("Sporelink"));
+    push_unique(&mut candidates, home_dir().join("Sporelink"));
+    push_unique(&mut candidates, exe_dir().join("SporelinkWorkspace"));
+    push_unique(
+        &mut candidates,
+        std::env::temp_dir().join("SporelinkWorkspace"),
+    );
+    candidates
+}
+
+/// Default workspace: Documents/Sporelink. A debug/test override can point
+/// somewhere else via SPORELINK_WORKSPACE.
+pub fn default_workspace() -> PathBuf {
+    default_workspace_candidates()
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| home_dir().join("Sporelink"))
+}
+
+/// WebView2 profile lives with the app config, not in a workspace and not in
+/// Windows AppData.
 pub fn webview_dir() -> PathBuf {
     if let Ok(value) = std::env::var("WEBVIEW2_USER_DATA_FOLDER") {
         if !value.trim().is_empty() {
             return PathBuf::from(value);
         }
     }
-    let mut candidates = Vec::new();
-    if let Some(dir) = dirs::data_local_dir() {
-        candidates.push(dir.join(APP_DIR).join("WebView2"));
-    }
-    candidates.push(data_dir().join("WebView2"));
-    candidates.push(exe_dir().join("WebView2"));
+    let mut candidates = vec![config_dir().join("webview2")];
+    candidates.push(exe_dir().join(".sporelink-webview2"));
     first_writable(candidates, "SporelinkWebView2")
 }
 
@@ -65,29 +92,12 @@ pub fn ensure_webview_env() {
     }
 }
 
-/// Best-effort creation of the locations Tauri/plugins may touch by identifier.
 pub fn ensure_tauri_dirs() {
-    let mut dirs = Vec::new();
-    if let Some(dir) = dirs::config_dir() {
-        dirs.push(dir.join(TAURI_IDENTIFIER));
-    }
-    if let Some(dir) = dirs::data_local_dir() {
-        dirs.push(dir.join(TAURI_IDENTIFIER));
-    }
-    if let Some(dir) = dirs::data_dir() {
-        dirs.push(dir.join(TAURI_IDENTIFIER));
-    }
-    for dir in dirs {
-        let _ = std::fs::create_dir_all(dir);
-    }
+    let _ = std::fs::create_dir_all(config_dir());
 }
 
 pub fn log_dir() -> PathBuf {
-    let mut candidates = Vec::new();
-    if let Some(dir) = dirs::data_local_dir() {
-        candidates.push(dir.join(APP_DIR).join("logs"));
-    }
-    candidates.push(data_dir().join("logs"));
+    let mut candidates = vec![config_dir().join("logs")];
     candidates.push(exe_dir().join("logs"));
     first_writable(candidates, "SporelinkLogs")
 }
@@ -95,11 +105,7 @@ pub fn log_dir() -> PathBuf {
 pub fn append_log(message: &str) {
     let dir = log_dir();
     let path = dir.join("startup.log");
-    let line = format!(
-        "[{}] {}\n",
-        time_stamp(),
-        message.replace('\n', " ")
-    );
+    let line = format!("[{}] {}\n", time_stamp(), message.replace('\n', " "));
     if let Ok(mut file) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
