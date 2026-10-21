@@ -92,10 +92,8 @@ pub fn vault_import(
     let value = export::read_json(Path::new(&path))?;
     if mode == "replace" {
         inner.store.clear_all()?;
-        service::import_graph(&inner.store, &value, None)
-    } else {
-        service::import_graph(&inner.store, &value, None)
     }
+    service::import_graph(&inner.store, &value, None)
 }
 
 #[tauri::command]
