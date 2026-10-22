@@ -98,6 +98,8 @@ src-tauri/       Tauri 2 + Rust 后端
 
 契约优先：改 IPC、存储 schema 或导出 schema 前，先改 [`docs/contracts.md`](docs/contracts.md)。
 
+发布：开发/调试期使用 portable exe；安装包、代码签名（首选 SignPath Foundation）与发布检查清单见 [`docs/release.md`](docs/release.md)。
+
 ## 许可证与归属
 
 - 本项目代码：GPL-3.0-or-later，见 [`LICENSE`](LICENSE)。

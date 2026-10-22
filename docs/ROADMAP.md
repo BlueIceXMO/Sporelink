@@ -392,6 +392,7 @@ packages/contracts  IPC、导出 schema、版本化 JSON
 - 网络：仅用户配置的 provider 域名；主机白名单；请求前展示目标。
 - 无遥测、无广告、无远程配置；更新检查默认关闭。
 - 依赖审计、签名构建、可复现打包。
+- 代码签名首选 SignPath Foundation（免费 OSS）；安装包/签名流程见 `release.md`。
 
 ### 5.8 性能预算
 
@@ -413,6 +414,8 @@ packages/contracts  IPC、导出 schema、版本化 JSON
 | **M4 文档、知识与搜索** | 4 周 | 解析/OCR、阅读窗、引用、知识花园、FTS/语义搜索 | 文档可读可引用；知识可检索复用 |
 | **M5 体验与扩展** | 3 周 | 2.5D 图、9 主题、命令面板、批处理、插件/CLI 雏形、无障碍 | 视觉/交互验收；键盘全流程 |
 | **M6 加固与发布** | 2 周 | 网络边界审计、迁移、性能、打包、文档、安全复查 | v0.1.0 验收全绿 |
+
+发布与签名细节见 `release.md`：开发期用 portable，beta/正式发布再生成安装包；首选 SignPath Foundation，备选 Certum / OV / EV / Azure Artifact Signing。
 
 约 **18–22 周**；可先发 alpha（M1–M2），再补 M3–M4。
 

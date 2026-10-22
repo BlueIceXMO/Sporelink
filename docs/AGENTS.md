@@ -6,7 +6,8 @@
 4. `contracts.md` — Node/Edge 存储、IPC、事件、导出 schema
 5. `architecture.md` — 分层、写入模型、上下文编译、安全边界
 6. `manual-smoke.md` — 可复现的手动验收脚本
-7. `../ref/reference/notes.md` — 设计 token，仅作参考
+7. `release.md` — 安装包、代码签名（首选 SignPath Foundation）与发布检查清单
+8. `../ref/reference/notes.md` — 设计 token，仅作参考
 
 规矩：
 
