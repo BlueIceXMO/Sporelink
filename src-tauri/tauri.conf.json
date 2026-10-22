@@ -41,6 +41,9 @@
     ],
     "shortDescription": "Local-first knowledge exploration",
     "longDescription": "Sporelink is a local-first desktop knowledge exploration tool built on a unified node/edge graph.",
+    "publisher": "BlueIceXMO",
+    "copyright": "Copyright © 2026 BlueIceXMO",
+    "category": "Productivity",
     "resources": [
       "../LICENSE",
       "../THIRD_PARTY_NOTICES.md",
